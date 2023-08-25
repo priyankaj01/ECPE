@@ -8,28 +8,70 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 import pdb, time
 
 def print_time():
-    print '\n----------{}----------'.format(time.strftime("%Y-%m-%d %X", time.localtime()))
+    print('\n----------{}----------'.format(time.strftime("%Y-%m-%d %X", time.localtime())))
+
+# def load_w2v(embedding_dim, embedding_dim_pos, train_file_path, embedding_path):
+#     print('\nload embedding...')
+
+#     words = []
+#     inputFile1 = open(train_file_path, 'r')
+#     for line in inputFile1.readlines():
+#         line = line.strip().split(',')
+#         emotion, clause = line[2], line[-1]
+#         words.extend( [emotion] + clause.split())
+#     words = set(words)  # 所有不重复词的集合
+#     word_idx = dict((c, k + 1) for k, c in enumerate(words)) # 每个词及词的位置
+#     word_idx_rev = dict((k + 1, c) for k, c in enumerate(words)) # 每个词及词的位置
+    
+#     w2v = {}
+#     inputFile2 = open(embedding_path, 'r')
+#     inputFile2.readline()
+#     for line in inputFile2.readlines():
+#         line = line.strip().split(' ')
+#         w, ebd = line[0], line[1:]
+#         w2v[w] = ebd
+
+#     embedding = [list(np.zeros(embedding_dim))]
+#     hit = 0
+#     for item in words:
+#         if item in w2v:
+#             vec = list(map(float, w2v[item]))
+#             hit += 1
+#         else:
+#             vec = list(np.random.rand(embedding_dim) / 5. - 0.1) # 从均匀分布[-0.1,0.1]中随机取
+#         embedding.append(vec)
+#     print('w2v_file: {}\nall_words: {} hit_words: {}'.format(embedding_path, len(words), hit))
+
+#     embedding_pos = [list(np.zeros(embedding_dim_pos))]
+#     embedding_pos.extend( [list(np.random.normal(loc=0.0, scale=0.1, size=embedding_dim_pos)) for i in range(200)] )
+
+#     embedding, embedding_pos = np.array(embedding), np.array(embedding_pos)
+    
+#     print("embedding.shape: {} embedding_pos.shape: {}".format(embedding.shape, embedding_pos.shape))
+#     print("load embedding done!\n")
+#     return word_idx_rev, word_idx, embedding, embedding_pos
+
 
 def load_w2v(embedding_dim, embedding_dim_pos, train_file_path, embedding_path):
     print('\nload embedding...')
 
     words = []
-    inputFile1 = open(train_file_path, 'r')
-    for line in inputFile1.readlines():
-        line = line.strip().split(',')
-        emotion, clause = line[2], line[-1]
-        words.extend( [emotion] + clause.split())
-    words = set(words)  # 所有不重复词的集合
-    word_idx = dict((c, k + 1) for k, c in enumerate(words)) # 每个词及词的位置
-    word_idx_rev = dict((k + 1, c) for k, c in enumerate(words)) # 每个词及词的位置
-    
+    with open(train_file_path, 'r', encoding='utf-8') as inputFile1:
+        for line in inputFile1.readlines():
+            line = line.strip().split(',')
+            emotion, clause = line[2], line[-1]
+            words.extend([emotion] + clause.split())
+    words = set(words)  # All unique words in the dataset
+    word_idx = dict((c, k + 1) for k, c in enumerate(words))  # Map each word to an index
+    word_idx_rev = dict((k + 1, c) for k, c in enumerate(words))  # Map each index to a word
+
     w2v = {}
-    inputFile2 = open(embedding_path, 'r')
-    inputFile2.readline()
-    for line in inputFile2.readlines():
-        line = line.strip().split(' ')
-        w, ebd = line[0], line[1:]
-        w2v[w] = ebd
+    with open(embedding_path, 'r', encoding='utf-8') as inputFile2:
+        inputFile2.readline()  # Skip the header line
+        for line in inputFile2.readlines():
+            line = line.strip().split(' ')
+            w, ebd = line[0], line[1:]
+            w2v[w] = ebd
 
     embedding = [list(np.zeros(embedding_dim))]
     hit = 0
@@ -38,18 +80,19 @@ def load_w2v(embedding_dim, embedding_dim_pos, train_file_path, embedding_path):
             vec = list(map(float, w2v[item]))
             hit += 1
         else:
-            vec = list(np.random.rand(embedding_dim) / 5. - 0.1) # 从均匀分布[-0.1,0.1]中随机取
+            vec = list(np.random.rand(embedding_dim) / 5. - 0.1)  # Random vector if not in w2v
         embedding.append(vec)
     print('w2v_file: {}\nall_words: {} hit_words: {}'.format(embedding_path, len(words), hit))
 
     embedding_pos = [list(np.zeros(embedding_dim_pos))]
-    embedding_pos.extend( [list(np.random.normal(loc=0.0, scale=0.1, size=embedding_dim_pos)) for i in range(200)] )
+    embedding_pos.extend([list(np.random.normal(loc=0.0, scale=0.1, size=embedding_dim_pos)) for _ in range(200)])
 
     embedding, embedding_pos = np.array(embedding), np.array(embedding_pos)
-    
+
     print("embedding.shape: {} embedding_pos.shape: {}".format(embedding.shape, embedding_pos.shape))
     print("load embedding done!\n")
     return word_idx_rev, word_idx, embedding, embedding_pos
+
 
 
 def load_data(input_file, word_idx, max_doc_len = 75, max_sen_len = 45):

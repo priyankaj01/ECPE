@@ -16,26 +16,26 @@ def load_w2v(w2v_file, embedding_dim, debug=False):
     # [0,0,...,0] represent absent words
     w2v.append([0.] * embedding_dim)
     word_dict = dict()
-    print 'load word_embedding...'
-    print 'word: {} embedding_dim: {}'.format(words, embedding_dim)
+    print('load word_embedding...')
+    print('word: {} embedding_dim: {}').format(words, embedding_dim)
     cnt = 0
     for line in fp:
         cnt += 1
         line = line.split()
         if len(line) != embedding_dim + 1:
-            print 'a bad word embedding: {}'.format(line[0])
+            print('a bad word embedding: {}').format(line[0])
             continue
         word_dict[line[0]] = cnt
         w2v.append([float(v) for v in line[1:]])
-    print 'done!'
+    print('done!')
     w2v = np.asarray(w2v, dtype=np.float32)
     #w2v -= np.mean(w2v, axis = 0) # zero-center
     #w2v /= np.std(w2v, axis = 0)
     if debug:
-        print 'shape of w2v:',np.shape(w2v)
+        print('shape of w2v:',np.shape(w2v))
         word='the'
-        print 'id of \''+word+'\':',word_dict[word]
-        print 'vector of \''+word+'\':',w2v[word_dict[word]]
+        print('id of \''+word+'\':',word_dict[word])
+        print('vector of \''+word+'\':',w2v[word_dict[word]])
     return word_dict, w2v
 
 #用于生成minibatch训练数据

@@ -1,7 +1,88 @@
+# # encoding: utf-8
+# # @author: zxding
+# # email: d.z.x@qq.com
+
+
+# import numpy as np
+# import tensorflow as tf
+# from sklearn.model_selection import KFold
+# import sys, os, time, codecs, pdb
+
+# from utils.tf_funcs import *
+# from utils.prepare_data import *
+
+# FLAGS = tf.app.flags.FLAGS
+# # >>>>>>>>>>>>>>>>>>>> For Model <<<<<<<<<<<<<<<<<<<< #
+# ## embedding parameters ##
+# tf.app.flags.DEFINE_string('w2v_file', '../data/w2v_200.txt', 'embedding file')
+# tf.app.flags.DEFINE_integer('embedding_dim', 200, 'dimension of word embedding')
+# tf.app.flags.DEFINE_integer('embedding_dim_pos', 50, 'dimension of position embedding')
+# ## input struct ##
+# tf.app.flags.DEFINE_integer('max_sen_len', 30, 'max number of tokens per sentence')
+# tf.app.flags.DEFINE_integer('max_doc_len', 75, 'max number of tokens per documents')
+# ## model struct ##
+# tf.app.flags.DEFINE_integer('n_hidden', 100, 'number of hidden unit')
+# tf.app.flags.DEFINE_integer('n_class', 2, 'number of distinct class')
+# # >>>>>>>>>>>>>>>>>>>> For Data <<<<<<<<<<<<<<<<<<<< #
+# tf.app.flags.DEFINE_string('log_file_name', '', 'name of log file')
+# # >>>>>>>>>>>>>>>>>>>> For Training <<<<<<<<<<<<<<<<<<<< #
+# tf.app.flags.DEFINE_integer('training_iter', 15, 'number of train iter')
+# tf.app.flags.DEFINE_string('scope', 'RNN', 'RNN scope')
+# # not easy to tune , a good posture of using data to train model is very important
+# tf.app.flags.DEFINE_integer('batch_size', 32, 'number of example per batch')
+# tf.app.flags.DEFINE_float('learning_rate', 0.005, 'learning rate')
+# tf.app.flags.DEFINE_float('keep_prob1', 0.8, 'word embedding training dropout keep prob')
+# tf.app.flags.DEFINE_float('keep_prob2', 1.0, 'softmax layer dropout keep prob')
+# tf.app.flags.DEFINE_float('l2_reg', 0.00001, 'l2 regularization')
+# tf.app.flags.DEFINE_float('cause', 1.000, 'lambda1')
+# tf.app.flags.DEFINE_float('pos', 1.00, 'lambda2')
+
+
+# def build_model(word_embedding, x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause, RNN = biLSTM):
+#     x = tf.nn.embedding_lookup(word_embedding, x)
+#     inputs = tf.reshape(x, [-1, FLAGS.max_sen_len, FLAGS.embedding_dim])
+#     inputs = tf.nn.dropout(inputs, keep_prob=keep_prob1)
+#     sen_len = tf.reshape(sen_len, [-1])
+#     def get_s(inputs, name):
+#         with tf.name_scope('word_encode'):  
+#             inputs = RNN(inputs, sen_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope+'word_layer' + name)
+#         with tf.name_scope('word_attention'):
+#             sh2 = 2 * FLAGS.n_hidden
+#             w1 = get_weight_varible('word_att_w1' + name, [sh2, sh2])
+#             b1 = get_weight_varible('word_att_b1' + name, [sh2])
+#             w2 = get_weight_varible('word_att_w2' + name, [sh2, 1])
+#             s = att_var(inputs,sen_len,w1,b1,w2)
+#         s = tf.reshape(s, [-1, FLAGS.max_doc_len, 2 * FLAGS.n_hidden])
+#         return s
+#     s = get_s(inputs, name='cause_word_encode')
+#     s = RNN(s, doc_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope + 'cause_sentence_layer')
+#     with tf.name_scope('sequence_prediction'):
+#         s1 = tf.reshape(s, [-1, 2 * FLAGS.n_hidden])
+#         s1 = tf.nn.dropout(s1, keep_prob=keep_prob2)
+
+#         w_cause = get_weight_varible('softmax_w_cause', [2 * FLAGS.n_hidden, FLAGS.n_class])
+#         b_cause = get_weight_varible('softmax_b_cause', [FLAGS.n_class])
+#         pred_cause = tf.nn.softmax(tf.matmul(s1, w_cause) + b_cause)
+#         pred_cause = tf.reshape(pred_cause, [-1, FLAGS.max_doc_len, FLAGS.n_class])
+    
+#     s = get_s(inputs, name='pos_word_encode')
+#     s = RNN(s, doc_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope + 'pos_sentence_layer')
+#     with tf.name_scope('sequence_prediction'):
+#         s1 = tf.reshape(s, [-1, 2 * FLAGS.n_hidden])
+#         s1 = tf.nn.dropout(s1, keep_prob=keep_prob2)
+
+#         w_pos = get_weight_varible('softmax_w_pos', [2 * FLAGS.n_hidden, FLAGS.n_class])
+#         b_pos = get_weight_varible('softmax_b_pos', [FLAGS.n_class])
+#         pred_pos = tf.nn.softmax(tf.matmul(s1, w_pos) + b_pos)
+#         pred_pos = tf.reshape(pred_pos, [-1, FLAGS.max_doc_len, FLAGS.n_class])
+
+#     reg = tf.nn.l2_loss(w_cause) + tf.nn.l2_loss(b_cause)
+#     reg += tf.nn.l2_loss(w_pos) + tf.nn.l2_loss(b_pos)
+#     return pred_pos, pred_cause, reg
+
 # encoding: utf-8
 # @author: zxding
 # email: d.z.x@qq.com
-
 
 import numpy as np
 import tensorflow as tf
@@ -11,65 +92,68 @@ import sys, os, time, codecs, pdb
 from utils.tf_funcs import *
 from utils.prepare_data import *
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.compat.v1.flags.FLAGS  # Use tf.compat.v1.flags for TensorFlow 2.x
 # >>>>>>>>>>>>>>>>>>>> For Model <<<<<<<<<<<<<<<<<<<< #
 ## embedding parameters ##
-tf.app.flags.DEFINE_string('w2v_file', '../data/w2v_200.txt', 'embedding file')
-tf.app.flags.DEFINE_integer('embedding_dim', 200, 'dimension of word embedding')
-tf.app.flags.DEFINE_integer('embedding_dim_pos', 50, 'dimension of position embedding')
+tf.compat.v1.flags.DEFINE_string('w2v_file', 'data_combine/w2v_200.txt', 'embedding file')
+tf.compat.v1.flags.DEFINE_integer('embedding_dim', 200, 'dimension of word embedding')
+tf.compat.v1.flags.DEFINE_integer('embedding_dim_pos', 50, 'dimension of position embedding')
 ## input struct ##
-tf.app.flags.DEFINE_integer('max_sen_len', 30, 'max number of tokens per sentence')
-tf.app.flags.DEFINE_integer('max_doc_len', 75, 'max number of tokens per documents')
+tf.compat.v1.flags.DEFINE_integer('max_sen_len', 30, 'max number of tokens per sentence')
+tf.compat.v1.flags.DEFINE_integer('max_doc_len', 75, 'max number of tokens per documents')
 ## model struct ##
-tf.app.flags.DEFINE_integer('n_hidden', 100, 'number of hidden unit')
-tf.app.flags.DEFINE_integer('n_class', 2, 'number of distinct class')
+tf.compat.v1.flags.DEFINE_integer('n_hidden', 100, 'number of hidden unit')
+tf.compat.v1.flags.DEFINE_integer('n_class', 2, 'number of distinct class')
 # >>>>>>>>>>>>>>>>>>>> For Data <<<<<<<<<<<<<<<<<<<< #
-tf.app.flags.DEFINE_string('log_file_name', '', 'name of log file')
+tf.compat.v1.flags.DEFINE_string('log_file_name', '', 'name of log file')
 # >>>>>>>>>>>>>>>>>>>> For Training <<<<<<<<<<<<<<<<<<<< #
-tf.app.flags.DEFINE_integer('training_iter', 15, 'number of train iter')
-tf.app.flags.DEFINE_string('scope', 'RNN', 'RNN scope')
+tf.compat.v1.flags.DEFINE_integer('training_iter', 15, 'number of train iter')
+tf.compat.v1.flags.DEFINE_string('scope', 'RNN', 'RNN scope')
 # not easy to tune , a good posture of using data to train model is very important
-tf.app.flags.DEFINE_integer('batch_size', 32, 'number of example per batch')
-tf.app.flags.DEFINE_float('learning_rate', 0.005, 'learning rate')
-tf.app.flags.DEFINE_float('keep_prob1', 0.8, 'word embedding training dropout keep prob')
-tf.app.flags.DEFINE_float('keep_prob2', 1.0, 'softmax layer dropout keep prob')
-tf.app.flags.DEFINE_float('l2_reg', 0.00001, 'l2 regularization')
-tf.app.flags.DEFINE_float('cause', 1.000, 'lambda1')
-tf.app.flags.DEFINE_float('pos', 1.00, 'lambda2')
+tf.compat.v1.flags.DEFINE_integer('batch_size', 32, 'number of example per batch')
+tf.compat.v1.flags.DEFINE_float('learning_rate', 0.005, 'learning rate')
+tf.compat.v1.flags.DEFINE_float('keep_prob1', 0.8, 'word embedding training dropout keep prob')
+tf.compat.v1.flags.DEFINE_float('keep_prob2', 1.0, 'softmax layer dropout keep prob')
+tf.compat.v1.flags.DEFINE_float('l2_reg', 0.00001, 'l2 regularization')
+tf.compat.v1.flags.DEFINE_float('cause', 1.000, 'lambda1')
+tf.compat.v1.flags.DEFINE_float('pos', 1.00, 'lambda2')
 
 
-def build_model(word_embedding, x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause, RNN = biLSTM):
+def build_model(word_embedding, x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause, RNN=biLSTM):
     x = tf.nn.embedding_lookup(word_embedding, x)
     inputs = tf.reshape(x, [-1, FLAGS.max_sen_len, FLAGS.embedding_dim])
-    inputs = tf.nn.dropout(inputs, keep_prob=keep_prob1)
+    inputs = tf.nn.dropout(inputs, rate=1 - keep_prob1)  # Updated dropout syntax
     sen_len = tf.reshape(sen_len, [-1])
+
     def get_s(inputs, name):
-        with tf.name_scope('word_encode'):  
-            inputs = RNN(inputs, sen_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope+'word_layer' + name)
+        with tf.name_scope('word_encode'):
+            inputs = RNN(inputs, sen_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope + 'word_layer' + name)
         with tf.name_scope('word_attention'):
             sh2 = 2 * FLAGS.n_hidden
             w1 = get_weight_varible('word_att_w1' + name, [sh2, sh2])
             b1 = get_weight_varible('word_att_b1' + name, [sh2])
             w2 = get_weight_varible('word_att_w2' + name, [sh2, 1])
-            s = att_var(inputs,sen_len,w1,b1,w2)
+            s = att_var(inputs, sen_len, w1, b1, w2)
         s = tf.reshape(s, [-1, FLAGS.max_doc_len, 2 * FLAGS.n_hidden])
         return s
+
     s = get_s(inputs, name='cause_word_encode')
     s = RNN(s, doc_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope + 'cause_sentence_layer')
     with tf.name_scope('sequence_prediction'):
         s1 = tf.reshape(s, [-1, 2 * FLAGS.n_hidden])
-        s1 = tf.nn.dropout(s1, keep_prob=keep_prob2)
+        s1 = tf.nn.dropout(s1, rate=1 - keep_prob2)  # Updated dropout syntax
 
         w_cause = get_weight_varible('softmax_w_cause', [2 * FLAGS.n_hidden, FLAGS.n_class])
         b_cause = get_weight_varible('softmax_b_cause', [FLAGS.n_class])
         pred_cause = tf.nn.softmax(tf.matmul(s1, w_cause) + b_cause)
         pred_cause = tf.reshape(pred_cause, [-1, FLAGS.max_doc_len, FLAGS.n_class])
-    
+
     s = get_s(inputs, name='pos_word_encode')
+    s = tf.concat([s, pred_cause], 2)
     s = RNN(s, doc_len, n_hidden=FLAGS.n_hidden, scope=FLAGS.scope + 'pos_sentence_layer')
     with tf.name_scope('sequence_prediction'):
         s1 = tf.reshape(s, [-1, 2 * FLAGS.n_hidden])
-        s1 = tf.nn.dropout(s1, keep_prob=keep_prob2)
+        s1 = tf.nn.dropout(s1, rate=1 - keep_prob2)  # Updated dropout syntax
 
         w_pos = get_weight_varible('softmax_w_pos', [2 * FLAGS.n_hidden, FLAGS.n_class])
         b_pos = get_weight_varible('softmax_b_pos', [FLAGS.n_class])
@@ -99,22 +183,30 @@ def run():
     if FLAGS.log_file_name:
         sys.stdout = open(save_dir + FLAGS.log_file_name, 'w')
     print_time()
-    tf.reset_default_graph()
+    # tf.reset_default_graph()
     # Model Code Block
     word_idx_rev, word_id_mapping, word_embedding, pos_embedding = load_w2v(FLAGS.embedding_dim, FLAGS.embedding_dim_pos, 'data_combine/clause_keywords.csv', FLAGS.w2v_file)
     word_embedding = tf.constant(word_embedding, dtype=tf.float32, name='word_embedding')
     pos_embedding = tf.constant(pos_embedding, dtype=tf.float32, name='pos_embedding')
 
     print('build model...')
-    
-    x = tf.placeholder(tf.int32, [None, FLAGS.max_doc_len, FLAGS.max_sen_len])
-    sen_len = tf.placeholder(tf.int32, [None, FLAGS.max_doc_len])
-    doc_len = tf.placeholder(tf.int32, [None])
-    keep_prob1 = tf.placeholder(tf.float32)
-    keep_prob2 = tf.placeholder(tf.float32)
-    y_position = tf.placeholder(tf.float32, [None, FLAGS.max_doc_len, FLAGS.n_class])
-    y_cause = tf.placeholder(tf.float32, [None, FLAGS.max_doc_len, FLAGS.n_class])
-    placeholders = [x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause]
+
+    #x = tf.Variable(tf.zeros([None, FLAGS.max_doc_len, FLAGS.max_sen_len], dtype=tf.int32)) 
+    # x = tf.placeholder(tf.int32, [None, FLAGS.max_doc_len, FLAGS.max_sen_len])
+    # sen_len = tf.placeholder(tf.int32, [None, FLAGS.max_doc_len])
+    # doc_len = tf.placeholder(tf.int32, [None])
+    # keep_prob1 = tf.placeholder(tf.float32)
+    # keep_prob2 = tf.placeholder(tf.float32)
+    # y_position = tf.placeholder(tf.float32, [None, FLAGS.max_doc_len, FLAGS.n_class])
+    # y_cause = tf.placeholder(tf.float32, [None, FLAGS.max_doc_len, FLAGS.n_class])
+    # placeholders = [x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause]
+    x = tf.keras.Input(shape=(None, FLAGS.max_doc_len, FLAGS.max_sen_len), dtype=tf.int32, name='x')
+    sen_len = tf.keras.Input(shape=(None, FLAGS.max_doc_len), dtype=tf.int32, name='sen_len')
+    doc_len = tf.keras.Input(shape=(None,), dtype=tf.int32, name='doc_len')
+    keep_prob1 = tf.keras.Input(shape=(), dtype=tf.float32, name='keep_prob1')
+    keep_prob2 = tf.keras.Input(shape=(), dtype=tf.float32, name='keep_prob2')
+    y_position = tf.keras.Input(shape=(None, FLAGS.max_doc_len, FLAGS.n_class), dtype=tf.float32, name='y_position')
+    y_cause = tf.keras.Input(shape=(None, FLAGS.max_doc_len, FLAGS.n_class), dtype=tf.float32, name='y_cause')
     
     
     pred_pos, pred_cause, reg = build_model(word_embedding, x, sen_len, doc_len, keep_prob1, keep_prob2, y_position, y_cause)
@@ -207,11 +299,11 @@ def run():
                         for k in range(sen_len[i][j]):
                             clause = clause + word_idx_rev[x[i][j][k]] + ' '
                         g.write(str(j+1)+', '+str(pred_y_pos[i][j])+', '+str(pred_y_cause[i][j])+', '+clause+'\n')
-                print 'write {} done'.format(file_name)
+                print('write {} done'.format(file_name))
             get_pair_data(save_dir + test_file_name, te_doc_id, te_doc_len, te_y_pairs, te_pred_y_cause, te_pred_y_pos, te_x, te_sen_len, word_idx_rev)
             get_pair_data(save_dir + train_file_name, tr_doc_id, tr_doc_len, tr_y_pairs, tr_pred_y_cause, tr_pred_y_pos, tr_x, tr_sen_len, word_idx_rev)
             
-            print 'Optimization Finished!\n'
+            print('Optimization Finished!\n')
             print('############# fold {} end ###############'.format(fold))
             # fold += 1
             acc_cause_list.append(result_avg_cause_max[0])
@@ -244,4 +336,5 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf.app.run() 
+    # tf.app.run()
+    tf.compat.v1.app.run()
